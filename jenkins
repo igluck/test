@@ -1,0 +1,66 @@
+docker.image('maven:3.3.3-jdk-8').inside {
+  git 'https://github.com/igluck/boxfuse-sample-java-war-hello.git'
+  sh 'mvn -B clean install'
+}
+
+pipeline {
+    environment {
+        registry = "igluckall/test"
+        registryCredential = '88576c3d-6868-4cb4-b078-bc46d7fb0c55'
+        dockerImage=''
+  }
+
+agent any
+
+stages {
+
+
+
+
+
+    stage('Get Dockerfile') {
+      steps {
+        git 'https://github.com/igluck/test.git'
+      }
+    }
+
+    stage('Build image') {
+      steps{
+        script {
+          dockerImage = docker.build registry + ":latest"
+        }
+      }
+    }
+
+    stage('Deploy Image') {
+      steps{
+        script {
+          docker.withRegistry( '', registryCredential ) {
+            dockerImage.push()
+          }
+        }
+      }
+    }
+
+    stage('Remove docker image') {
+      steps{
+        sh "docker rmi $registry:latest"
+      }
+    }
+
+  }
+}
+def remote = [:]
+remote.name = "node-1"
+remote.host = "192.168.142.129"
+remote.allowAnyHosts = true
+
+node {
+    withCredentials([sshUserPrivateKey(credentialsId: 'd740844a-7b23-4c4e-a630-6533cce274a3', keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
+        remote.user = 'root'
+        remote.identityFile = identity
+        stage("SSH Steps Rocks!") {
+            sshCommand remote: remote, command: 'docker run -d --rm -p 8888:8080 igluckall/test:latest'
+        }
+    }
+}
